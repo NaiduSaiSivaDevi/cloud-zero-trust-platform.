@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloud Providers — CloudGuard Zero Trust</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="app-sidebar"></aside>
+    <div class="main-wrapper">
+      <header class="topbar" id="app-topbar"></header>
+      <main class="content-area">
+        <div id="page-banner"></div>
+        <div class="banner banner-info">
+          <strong>DEMO MODE:</strong> Connected providers use sample configuration datasets locally. Real cloud accounts are never scanned without authorized credentials.
+        </div>
+
+        <section class="card" style="margin-bottom:20px;">
+          <div class="card-header"><h2 class="card-title">Add Cloud Provider (Demo Mode)</h2></div>
+          <form id="add-provider-form" class="form-grid">
+            <div class="form-group">
+              <label for="p-name">Display Name</label>
+              <input id="p-name" type="text" required placeholder="AWS Production Account" />
+            </div>
+            <div class="form-group">
+              <label for="p-type">Provider</label>
+              <select id="p-type">
+                <option value="AWS">AWS</option>
+                <option value="Azure">Microsoft Azure</option>
+                <option value="GCP">Google Cloud (GCP)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="p-account">Account / Subscription / Project ID</label>
+              <input id="p-account" type="text" required placeholder="123456789012" />
+            </div>
+            <div class="form-group">
+              <label for="p-env">Environment</label>
+              <select id="p-env">
+                <option value="production">production</option>
+                <option value="staging">staging</option>
+              </select>
+            </div>
+            <div class="form-group" style="justify-content:flex-end;">
+              <button type="submit" class="btn btn-primary">Add Provider</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="grid-3" id="providers-grid">
+          <div class="card">Loading providers...</div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/layout.js"></script>
+  <script>
+    if (initLayout("Cloud Providers", "Multi-Cloud Connections")) {
+      async function loadProviders() {
+        try {
+          const providers = await apiRequest("/api/providers");
+          const grid = document.getElementById("providers-grid");
+          if (!providers.length) {
+            grid.innerHTML = `<div class="card">No cloud providers configured yet.</div>`;
+            return;
+          }
+          grid.innerHTML = providers.map(p => `
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div style="font-weight:700;font-size:15px;">${escapeHtml(p.name)}</div>
+                  <div style="font-size:12px;color:#64748B;">${escapeHtml(p.provider_type)} · ${escapeHtml(p.environment)}</div>
+                </div>
+                <span class="pill pill-${p.status}">${escapeHtml(p.status)}</span>
+              </div>
+              <div style="font-size:13px;color:#475569;margin-bottom:14px;">
+                <div><strong>Account ID:</strong> <code>${escapeHtml(p.account_id)}</code></div>
+                <div><strong>Resources:</strong> ${p.resource_count}</div>
+                <div><strong>Last Scan:</strong> ${formatDate(p.last_scan_at)}</div>
+                <div style="margin-top:6px;"><span class="pill pill-demo">DEMO MODE</span></div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-secondary btn-sm" onclick="toggleConnect(${p.id})">
+                  ${p.status === "connected" ? "Disconnect" : "Connect"}
+                </button>
+                <a class="btn btn-primary btn-sm" href="scanner.html?provider_id=${p.id}">Scan</a>
+                <button class="btn btn-danger btn-sm" onclick="removeProvider(${p.id})">Delete</button>
+              </div>
+            </div>
+          `).join("");
+        } catch (err) {
+          showBanner("page-banner", err.message, "error");
+        }
+      }
+
+      window.toggleConnect = async (id) => {
+        try {
+          await apiRequest(`/api/providers/${id}/connect`, { method: "POST" });
+          loadProviders();
+        } catch (err) {
+          showBanner("page-banner", err.message, "error");
+        }
+      };
+
+      window.removeProvider = async (id) => {
+        if (!confirm("Delete this provider and its scan history?")) return;
+        try {
+          await apiRequest(`/api/providers/${id}`, { method: "DELETE" });
+          showBanner("page-banner", "Provider deleted.", "success");
+          loadProviders();
+        } catch (err) {
+          showBanner("page-banner", err.message, "error");
+        }
+      };
+
+      document.getElementById("add-provider-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        try {
+          await apiRequest("/api/providers", {
+            method: "POST",
+            body: JSON.stringify({
+              name: document.getElementById("p-name").value.trim(),
+              provider_type: document.getElementById("p-type").value,
+              account_id: document.getElementById("p-account").value.trim(),
+              environment: document.getElementById("p-env").value,
+              is_demo: true,
+            }),
+          });
+          e.target.reset();
+          showBanner("page-banner", "Cloud provider saved to database (DEMO MODE).", "success");
+          loadProviders();
+        } catch (err) {
+          showBanner("page-banner", err.message, "error");
+        }
+      });
+
+      loadProviders();
+    }
+  </script>
+</body>
+</html>

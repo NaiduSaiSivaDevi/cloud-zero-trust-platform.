@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Policy Optimization — CloudGuard Zero Trust</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="app-sidebar"></aside>
+    <div class="main-wrapper">
+      <header class="topbar" id="app-topbar"></header>
+      <main class="content-area">
+        <div id="page-banner"></div>
+        <div class="banner banner-warning">
+          <strong>Compliance &amp; Cost Notice:</strong> Mandatory security controls are never weakened to reduce cost. Estimated monthly cost reflects policy evaluation compute overhead only, separate from actual cloud provider billing.
+        </div>
+
+        <section class="card" style="margin-bottom:20px;">
+          <div class="card-header"><h2 class="card-title">Cost-Aware Adaptive Policy Comparison</h2></div>
+          <form id="opt-form" class="form-grid">
+            <div class="form-group">
+              <label for="opt-current">Baseline Policy</label>
+              <select id="opt-current"></select>
+            </div>
+            <div class="form-group" style="justify-content:flex-end;">
+              <button type="submit" class="btn btn-primary">Compare All Policies</button>
+            </div>
+          </form>
+          <div id="opt-recommendation" style="margin-top:12px;"></div>
+        </section>
+
+        <section class="grid-2" id="opt-visuals" style="margin-bottom:20px;">
+          <div class="card">
+            <div class="card-header"><h2 class="card-title">Recommended Policy Score &amp; Cost Split</h2></div>
+            <div id="opt-donut-chart" style="color:#64748B;font-size:13px;">Run a policy comparison to view the circular score &amp; cost breakdown.</div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h2 class="card-title">Monthly Cost Overhead Graph ($/mo)</h2></div>
+            <div id="opt-cost-graph" style="color:#64748B;font-size:13px;">Run a policy comparison to view the policy cost comparison graph.</div>
+          </div>
+        </section>
+
+        <section class="grid-2">
+          <div class="card">
+            <div class="card-header"><h2 class="card-title">Policy Comparison Matrix</h2></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Policy</th>
+                    <th>Security Score</th>
+                    <th>Risk</th>
+                    <th>Latency</th>
+                    <th>CPU %</th>
+                    <th>Est. Cost ($/mo)</th>
+                    <th>Composite Index</th>
+                  </tr>
+                </thead>
+                <tbody id="opt-table-body">
+                  <tr><td colspan="7">Run a comparison to evaluate policies.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h2 class="card-title">Optimization History</h2></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Baseline</th>
+                    <th>Recommended</th>
+                    <th>Est. Cost</th>
+                  </tr>
+                </thead>
+                <tbody id="opt-history-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/layout.js"></script>
+  <script>
+    if (initLayout("Policy Optimization", "Cost-Aware Adaptive Security")) {
+      async function loadInitial() {
+        try {
+          const [policies, history] = await Promise.all([
+            apiRequest("/api/zero-trust/policies"),
+            apiRequest("/api/optimization/results"),
+          ]);
+          document.getElementById("opt-current").innerHTML = policies.map(p =>
+            `<option value="${p.id}">${escapeHtml(p.name)} (${escapeHtml(p.effect)})</option>`
+          ).join("");
+
+          document.getElementById("opt-history-body").innerHTML = history.length ? history.map(h => `
+            <tr>
+              <td>${formatDate(h.created_at)}</td>
+              <td>${escapeHtml(h.current_policy_name)}</td>
+              <td><strong>${escapeHtml(h.recommended_policy_name)}</strong></td>
+              <td>$${h.estimated_monthly_cost}</td>
+            </tr>
+          `).join("") : `<tr><td colspan="4">No optimization runs recorded yet.</td></tr>`;
+
+          if (history.length && document.getElementById("opt-cost-graph").dataset.hasCompare !== "1") {
+            const maxCost = Math.max(...history.slice(0, 6).map(h => Number(h.estimated_monthly_cost) || 0), 1);
+            document.getElementById("opt-cost-graph").innerHTML = `
+              <div class="graph-bars">
+                ${history.slice(0, 6).map(h => {
+                  const val = Number(h.estimated_monthly_cost) || 0;
+                  const pct = Math.max(Math.round((val / maxCost) * 100), 8);
+                  return `
+                    <div class="graph-col" title="${escapeHtml(h.recommended_policy_name)}: $${val}/mo">
+                      <span class="graph-col-val">$${val}</span>
+                      <div class="graph-col-bar" style="height:${pct}%;background:#3B82F6;"></div>
+                      <span class="graph-col-lbl">${escapeHtml(h.recommended_policy_name)}</span>
+                    </div>
+                  `;
+                }).join("")}
+              </div>
+            `;
+          }
+        } catch (err) {
+          showBanner("page-banner", err.message, "error");
+        }
+      }
+
+      function renderOptimizationCharts(rec, comparisons) {
+        const radius = 50;
+        const circumference = 2 * Math.PI * radius;
+        const score = Math.max(0, Math.min(100, Number(rec.security_score) || 0));
+        const scoreLen = (score / 100) * circumference;
+
+        document.getElementById("opt-donut-chart").innerHTML = `
+          <div class="donut-wrap">
+            <svg class="donut-svg" viewBox="0 0 136 136" role="img" aria-label="Security Score">
+              <circle cx="68" cy="68" r="${radius}" fill="none" stroke="#E2E8F0" stroke-width="18" />
+              <circle cx="68" cy="68" r="${radius}" fill="none" stroke="#059669" stroke-width="18"
+                stroke-dasharray="${scoreLen.toFixed(2)} ${circumference.toFixed(2)}"
+                stroke-linecap="round"
+                transform="rotate(-90 68 68)" />
+              <text x="68" y="65" text-anchor="middle" class="donut-center-val">${score}</text>
+              <text x="68" y="81" text-anchor="middle" class="donut-center-lbl">Score / 100</text>
+            </svg>
+            <div class="donut-legend">
+              <div class="legend-row">
+                <span class="legend-left"><span class="legend-dot" style="background:#059669;"></span><span>Security Score</span></span>
+                <span class="legend-val">${score}/100</span>
+              </div>
+              <div class="legend-row">
+                <span class="legend-left"><span class="legend-dot" style="background:#D97706;"></span><span>Risk Score</span></span>
+                <span class="legend-val">${rec.risk_score}</span>
+              </div>
+              <div class="legend-row">
+                <span class="legend-left"><span class="legend-dot" style="background:#3B82F6;"></span><span>Est. Cost</span></span>
+                <span class="legend-val">$${rec.estimated_monthly_cost}/mo</span>
+              </div>
+              <div class="legend-row">
+                <span class="legend-left"><span class="legend-dot" style="background:#6366F1;"></span><span>Composite Index</span></span>
+                <span class="legend-val">${rec.composite_index}</span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const maxCost = Math.max(...comparisons.map(c => Number(c.estimated_monthly_cost) || 0), 1);
+        const graphEl = document.getElementById("opt-cost-graph");
+        graphEl.dataset.hasCompare = "1";
+        graphEl.innerHTML = `
+          <div class="graph-bars">
+            ${comparisons.map(c => {
+              const cost = Number(c.estimated_monthly_cost) || 0;
+              const pct = Math.max(Math.round((cost / maxCost) * 100), 8);
+              const isRec = c.policy_id === rec.policy_id;
+              return `
+                <div class="graph-col" title="${escapeHtml(c.policy_name)}: $${cost}/mo">
+                  <span class="graph-col-val">$${cost}</span>
+                  <div class="graph-col-bar" style="height:${pct}%;background:${isRec ? '#059669' : '#3B82F6'};"></div>
+                  <span class="graph-col-lbl">${escapeHtml(c.policy_name)}</span>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        `;
+      }
+
+      document.getElementById("opt-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        try {
+          const res = await apiRequest("/api/optimization/compare", {
+            method: "POST",
+            body: JSON.stringify({
+              current_policy_id: Number(document.getElementById("opt-current").value),
+              candidate_policy_ids: [],
+            }),
+          });
+
+          const rec = res.recommended_policy;
+          document.getElementById("opt-recommendation").innerHTML = `
+            <div class="banner banner-success">
+              <strong>Recommended Compliant Policy: ${escapeHtml(rec.policy_name)}</strong><br />
+              Security Score: ${rec.security_score}/100 · Latency: ${rec.latency_ms} ms · Est. Overhead: $${rec.estimated_monthly_cost}/mo · Composite Index: ${rec.composite_index}
+            </div>
+          `;
+
+          document.getElementById("opt-table-body").innerHTML = res.comparisons.map(c => `
+            <tr>
+              <td><strong>${escapeHtml(c.policy_name)}</strong> ${c.policy_id === rec.policy_id ? '<span class="pill pill-allow">Recommended</span>' : ''}</td>
+              <td>${c.security_score}</td>
+              <td>${c.risk_score}</td>
+              <td>${c.latency_ms} ms</td>
+              <td>${c.cpu_utilization_pct}%</td>
+              <td>$${c.estimated_monthly_cost}</td>
+              <td><strong>${c.composite_index}</strong></td>
+            </tr>
+          `).join("");
+
+          renderOptimizationCharts(rec, res.comparisons);
+          loadInitial();
+        } catch (err) {
+          showBanner("page-banner", err.message, "error");
+        }
+      });
+
+      loadInitial();
+    }
+  </script>
+</body>
+</html>
