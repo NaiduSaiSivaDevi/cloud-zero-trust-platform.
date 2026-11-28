@@ -1,6 +1,0 @@
-.env
-*.db
-__pycache__/
-.venv/
-generated_reports/
-node_modules/

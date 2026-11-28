@@ -161,6 +161,7 @@ function initLayout(pageTitle, breadcrumbText) {
           <span>${escapeHtml(user.email)}</span>
           <span class="pill pill-info">${escapeHtml(user.role)}</span>
         </div>
+        <button class="btn btn-secondary btn-sm" id="logout-btn" type="button">Sign out</button>
       </div>
     `;
 
@@ -172,6 +173,14 @@ function initLayout(pageTitle, breadcrumbText) {
         localStorage.setItem("cg_theme", nextTheme);
         applyTheme(nextTheme);
         window.dispatchEvent(new CustomEvent("cg-theme-change", { detail: { theme: nextTheme } }));
+      });
+    }
+
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn) {
+      logoutBtn.addEventListener("click", () => {
+        clearSession();
+        window.location.replace("login.html");
       });
     }
 

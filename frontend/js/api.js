@@ -3,7 +3,8 @@ const DEFAULT_API_BASE = ["localhost", "127.0.0.1"].includes(window.location.hos
   : window.location.origin;
 
 function getApiBase() {
-  return localStorage.getItem("cg_api_base") || DEFAULT_API_BASE;
+  const configuredBase = localStorage.getItem("cg_api_base") || window.CLOUDGUARD_API_BASE;
+  return (configuredBase || DEFAULT_API_BASE).replace(/\/+$/, "");
 }
 
 function getToken() {
@@ -37,7 +38,14 @@ function clearSession() {
 }
 
 function requireAuth() {
-  return true;
+  if (getToken() || ["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+    return true;
+  }
+
+  const currentPage = window.location.pathname.split("/").pop() || "dashboard.html";
+  const next = `${currentPage}${window.location.search}`;
+  window.location.replace(`login.html?next=${encodeURIComponent(next)}`);
+  return false;
 }
 
 async function apiRequest(path, options = {}) {
@@ -56,15 +64,20 @@ async function apiRequest(path, options = {}) {
       ...options,
       headers,
     });
-  } catch (err) {
+  } catch {
     throw new Error(
-      `Cannot reach backend API at ${getApiBase()}. Ensure FastAPI is running on port 8000.`
+      `Cannot reach backend API at ${getApiBase()}. Check the backend URL and CORS configuration.`
     );
   }
 
   if (response.status === 401) {
     clearSession();
-    throw new Error("Unauthorized request.");
+    if (!window.location.pathname.endsWith("/login.html")) {
+      const currentPage = window.location.pathname.split("/").pop() || "dashboard.html";
+      const next = `${currentPage}${window.location.search}`;
+      window.location.replace(`login.html?next=${encodeURIComponent(next)}`);
+      throw new Error("Session expired. Please sign in again.");
+    }
   }
 
   if (response.status === 204) {

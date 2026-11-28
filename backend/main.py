@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from database import Base, SessionLocal, engine
 from routes import (
@@ -47,6 +48,13 @@ app.include_router(ops_routes.router)
 @app.get("/", include_in_schema=False)
 def root():
     return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.get("/health", tags=["Health"])
+def health():
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+    return {"status": "ok", "database": "ok"}
 
 
 app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
