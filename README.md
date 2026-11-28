@@ -76,7 +76,9 @@ node serve.mjs
 
 ## Deploying to Vercel
 
-Deploy the repository root as one Vercel project. Set **Root Directory** to the repository root (not `backend/` or `frontend/`). Vercel's Python runtime detects the root `app.py` FastAPI entrypoint and installs `requirements.txt`; the API and frontend are served from the same origin. No `vercel.json` is required for this layout. Keep the **Python Version** at 3.12, matching `.python-version`, and do not set a separate build output directory.
+For a backend-only deployment from this monorepo, set Vercel **Root Directory** to `backend` (not `frontend`). Vercel then finds `main.py` with the `app` FastAPI instance, installs `backend/requirements.txt`, and uses `backend/.python-version` (Python 3.12). Leave the Build Command and Output Directory unset. No `vercel.json` is required: Vercel's Python runtime routes requests through the FastAPI app.
+
+If you pushed the contents of `backend/` into a separate backend-only Git repository, set that repository's Vercel **Root Directory** to `.` instead; its root should contain `main.py`, `requirements.txt`, and `.python-version`. Do not point that deployment at the frontend project.
 
 Add these environment variables in Vercel project settings for Production and any Preview environment that should run:
 
@@ -92,7 +94,7 @@ The included `backend/.env.example` shows the required variable names; do not co
 
 ### Frontend API origin
 
-The bundled frontend defaults to the current origin, which is correct when the root project serves both the frontend and API. If the frontend remains in a separate Vercel project, set the API origin once in that browser's developer console:
+The frontend is deployed separately. Set its API origin to the backend deployment URL once in that browser's developer console:
 
 ```js
 localStorage.setItem("cg_api_base", "https://YOUR-BACKEND-DEPLOYMENT.vercel.app");
@@ -104,22 +106,23 @@ For a deployment-specific script configuration instead, define `window.CLOUDGUAR
 
 ### Local verification
 
-From the repository root:
+From the backend directory:
 
 ```powershell
+cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-uvicorn app:app --reload --host 127.0.0.1 --port 8000
+uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Check `http://127.0.0.1:8000/`, `http://127.0.0.1:8000/health`, and `http://127.0.0.1:8000/docs`. `/health` reports database readiness after successfully running a simple query.
+Check `http://127.0.0.1:8000/`, `http://127.0.0.1:8000/health`, and `http://127.0.0.1:8000/docs`. `/` returns JSON; `/health` reports database readiness after successfully running a simple query.
 
 For a separate frontend project, set the API base to the backend deployment URL as described above; do not set the frontend project as the backend's Root Directory.
 
 ### Vercel deploy and smoke-test
 
-After adding the environment variables, deploy from the repository root with `vercel --prod` or push the branch connected to Vercel. Test `https://YOUR-BACKEND-DEPLOYMENT.vercel.app/`, `/health`, and `/docs`; then use `/api/providers` with a JWT from `/api/auth/login` to check a seeded API route. A successful local test does not imply the Vercel deployment succeeded.
+After adding the environment variables and setting the Root Directory, redeploy from Vercel or run `vercel --prod` from the backend directory. Test `https://YOUR-BACKEND-DEPLOYMENT.vercel.app/`, `/health`, and `/docs`; then use `/api/providers` with a JWT from `/api/auth/login` to check a seeded API route. A successful local test does not imply the Vercel deployment succeeded.
 
 ## Seeded Demo Accounts
 - **Admin:** `admin@cloudguard.io` / `admin123`

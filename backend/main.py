@@ -1,9 +1,5 @@
-from pathlib import Path
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from database import Base, SessionLocal, engine
@@ -16,8 +12,6 @@ from routes import (
     scanner_routes,
 )
 from services.seed import seed_initial_data
-
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 # Initialize database tables and seed default records
 Base.metadata.create_all(bind=engine)
@@ -47,7 +41,11 @@ app.include_router(ops_routes.router)
 
 @app.get("/", include_in_schema=False)
 def root():
-    return FileResponse(FRONTEND_DIR / "index.html")
+    return {
+        "message": "CloudGuard Zero Trust API",
+        "health": "/health",
+        "docs": "/docs",
+    }
 
 
 @app.get("/health", tags=["Health"])
@@ -55,6 +53,3 @@ def health():
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
     return {"status": "ok", "database": "ok"}
-
-
-app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
