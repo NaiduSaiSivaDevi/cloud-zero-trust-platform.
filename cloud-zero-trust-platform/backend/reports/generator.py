@@ -1,9 +1,13 @@
 import csv
 import os
+import tempfile
 from datetime import datetime
 from typing import List
 
-REPORTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "generated_reports")
+if os.getenv("VERCEL") == "1":
+    REPORTS_DIR = os.path.join(tempfile.gettempdir(), "cloudguard_generated_reports")
+else:
+    REPORTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "generated_reports")
 os.makedirs(REPORTS_DIR, exist_ok=True)
 
 

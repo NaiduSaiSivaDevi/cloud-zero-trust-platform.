@@ -1,27 +1,68 @@
+import os
+
 from sqlalchemy.orm import Session
-from auth import hash_password
+from auth import hash_password, verify_password
 from models import User, CloudProvider, ZeroTrustPolicy, AuditLog
 
 
 def seed_initial_data(db: Session) -> None:
-    if db.query(User).count() == 0:
-        users = [
-            User(
-                email="admin@cloudguard.io",
-                full_name="Security Administrator",
-                hashed_password=hash_password("admin123"),
-                role="admin",
-                is_active=True,
-            ),
-            User(
-                email="analyst@cloudguard.io",
-                full_name="Cloud Security Analyst",
-                hashed_password=hash_password("analyst123"),
-                role="analyst",
-                is_active=True,
-            ),
-        ]
-        db.add_all(users)
+    if os.getenv("VERCEL") == "1":
+        admin_email = os.getenv("INITIAL_ADMIN_EMAIL")
+        admin_password = os.getenv("INITIAL_ADMIN_PASSWORD")
+        if not admin_email or not admin_password:
+            raise RuntimeError(
+                "Set INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD in Vercel project settings."
+            )
+        if admin_password in {"admin123", "analyst123"}:
+            raise RuntimeError("Choose an INITIAL_ADMIN_PASSWORD different from the demo passwords.")
+
+        admin_user = db.query(User).filter(User.email == admin_email).first()
+        if admin_user:
+            admin_user.role = "admin"
+            admin_user.is_active = True
+        else:
+            db.add(
+                User(
+                    email=admin_email,
+                    full_name="Security Administrator",
+                    hashed_password=hash_password(admin_password),
+                    role="admin",
+                    is_active=True,
+                )
+            )
+
+        demo_accounts = (
+            ("admin@cloudguard.io", "admin123"),
+            ("analyst@cloudguard.io", "analyst123"),
+        )
+        for email, demo_password in demo_accounts:
+            user = db.query(User).filter(User.email == email).first()
+            if user and verify_password(demo_password, user.hashed_password):
+                if email == admin_email:
+                    user.hashed_password = hash_password(admin_password)
+                    user.role = "admin"
+                    user.is_active = True
+                else:
+                    user.is_active = False
+    elif db.query(User).count() == 0:
+        db.add_all(
+            [
+                User(
+                    email="admin@cloudguard.io",
+                    full_name="Security Administrator",
+                    hashed_password=hash_password("admin123"),
+                    role="admin",
+                    is_active=True,
+                ),
+                User(
+                    email="analyst@cloudguard.io",
+                    full_name="Cloud Security Analyst",
+                    hashed_password=hash_password("analyst123"),
+                    role="analyst",
+                    is_active=True,
+                ),
+            ]
+        )
 
     if db.query(CloudProvider).count() == 0:
         providers = [

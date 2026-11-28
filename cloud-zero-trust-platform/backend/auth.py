@@ -12,7 +12,11 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "cloudguard-dev-secret-change-in-production")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY:
+    if os.getenv("VERCEL") == "1":
+        raise RuntimeError("Set JWT_SECRET_KEY in Vercel project settings.")
+    SECRET_KEY = "cloudguard-dev-secret-change-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 12
 
@@ -55,16 +59,18 @@ def get_current_user(token: Optional[str] = Depends(oauth2_scheme), db: Session 
         except JWTError:
             pass
 
-    # Direct access mode: fall back to the seeded active admin user when login is disabled
-    default_user = db.query(User).filter(User.role == "admin", User.is_active == True).first()  # noqa: E712
-    if not default_user:
-        default_user = db.query(User).filter(User.is_active == True).first()  # noqa: E712
-    if not default_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No active user available in database",
-        )
-    return default_user
+    if os.getenv("VERCEL") != "1":
+        # Keep direct-access mode for local demo use only.
+        default_user = db.query(User).filter(User.role == "admin", User.is_active == True).first()  # noqa: E712
+        if not default_user:
+            default_user = db.query(User).filter(User.is_active == True).first()  # noqa: E712
+        if default_user:
+            return default_user
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required",
+    )
 
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:

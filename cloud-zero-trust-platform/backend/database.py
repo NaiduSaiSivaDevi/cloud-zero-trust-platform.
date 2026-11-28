@@ -3,9 +3,13 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./cloud_zero_trust.db")
+configured_database_url = os.getenv("DATABASE_URL")
+if os.getenv("VERCEL") == "1" and not configured_database_url:
+    raise RuntimeError("Set DATABASE_URL to a persistent PostgreSQL database in Vercel project settings.")
+
+DATABASE_URL = configured_database_url or "sqlite:///./cloud_zero_trust.db"
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 

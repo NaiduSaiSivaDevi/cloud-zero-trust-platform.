@@ -1,4 +1,6 @@
-const DEFAULT_API_BASE = "https://cloud-zero-trust-platform-cvdq.vercel.app/";
+const DEFAULT_API_BASE = ["localhost", "127.0.0.1"].includes(window.location.hostname)
+  ? "http://127.0.0.1:8000"
+  : window.location.origin;
 
 function getApiBase() {
   return localStorage.getItem("cg_api_base") || DEFAULT_API_BASE;
