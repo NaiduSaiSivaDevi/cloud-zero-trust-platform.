@@ -34,7 +34,6 @@ Full-stack web application built with **HTML5, CSS3, Vanilla JavaScript** (front
 │       └── seed.py
 ├── frontend/
 │   ├── index.html
-│   ├── login.html
 │   ├── dashboard.html
 │   ├── providers.html
 │   ├── scanner.html
@@ -87,7 +86,7 @@ Add these environment variables in Vercel project settings for Production and an
 - `INITIAL_ADMIN_PASSWORD`: a strong unique password, not `admin123` or `analyst123`.
 
 The local demo credentials are not seeded on Vercel, and protected API routes require authentication there. Generated reports use temporary storage on Vercel and are not guaranteed to survive across function instances; use persistent object storage for durable report downloads.
-The deployment admin signs in at `/login.html` using `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD`. Unauthenticated users are redirected to sign-in in deployed environments; local demo mode remains accessible without login.
+The frontend does not include a sign-in page. Protected deployment API routes still require a JWT from `/api/auth/login`; local demo mode remains accessible without login.
 
 The included `backend/.env.example` shows the required variable names; do not commit real credentials. An unset database/JWT/admin variable causes an explicit startup failure, which appears as a Vercel `FUNCTION_INVOCATION_FAILED`.
 
@@ -120,7 +119,7 @@ For a separate frontend project, set the API base to the backend deployment URL 
 
 ### Vercel deploy and smoke-test
 
-After adding the environment variables, deploy from the repository root with `vercel --prod` or push the branch connected to Vercel. Test `https://YOUR-BACKEND-DEPLOYMENT.vercel.app/`, `/health`, and `/docs`; then use `/api/providers` (requires deployment login/token) to check a seeded API route. A successful local test does not imply the Vercel deployment succeeded.
+After adding the environment variables, deploy from the repository root with `vercel --prod` or push the branch connected to Vercel. Test `https://YOUR-BACKEND-DEPLOYMENT.vercel.app/`, `/health`, and `/docs`; then use `/api/providers` with a JWT from `/api/auth/login` to check a seeded API route. A successful local test does not imply the Vercel deployment succeeded.
 
 ## Seeded Demo Accounts
 - **Admin:** `admin@cloudguard.io` / `admin123`

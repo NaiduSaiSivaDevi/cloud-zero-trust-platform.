@@ -38,14 +38,7 @@ function clearSession() {
 }
 
 function requireAuth() {
-  if (getToken() || ["localhost", "127.0.0.1"].includes(window.location.hostname)) {
-    return true;
-  }
-
-  const currentPage = window.location.pathname.split("/").pop() || "dashboard.html";
-  const next = `${currentPage}${window.location.search}`;
-  window.location.replace(`login.html?next=${encodeURIComponent(next)}`);
-  return false;
+  return true;
 }
 
 async function apiRequest(path, options = {}) {
@@ -72,12 +65,7 @@ async function apiRequest(path, options = {}) {
 
   if (response.status === 401) {
     clearSession();
-    if (!window.location.pathname.endsWith("/login.html")) {
-      const currentPage = window.location.pathname.split("/").pop() || "dashboard.html";
-      const next = `${currentPage}${window.location.search}`;
-      window.location.replace(`login.html?next=${encodeURIComponent(next)}`);
-      throw new Error("Session expired. Please sign in again.");
-    }
+    throw new Error("Unauthorized request.");
   }
 
   if (response.status === 204) {
